@@ -1,0 +1,33 @@
+Косяки по CP
+1) Неизвестный читалке формат картинок
+<svg:svg viewBox="0 0 1068 1600">
+<svg:image xlink:href="../images/1601633041.jpg" transform="translate(0 0)" width="1068" height="1600"/>
+</svg:svg>
+ Пример решения: 
+<div class="cover"><img alt="cover" height="95%" src="../images/1601633041.jpg"/></div>
+
+2) Маркеры отступов
+
+	В епабах CP в читалке iBooks всё ок, в нашей читалке маркеры смещаются в центр.
+	<p class="common3"><img src="../images/common3.jpg" alt="Image"/> Click on the bell icon to switch between your personal and professional pages.</p>
+
+	Решение: строить конструкцию вида 
+	<ul>
+		<li>
+			Click on the bell icon to switch between your personal and professional pages.
+		</li>
+	</ul>
+
+
+3) В файле toc.ncx присутствуют главы вида: 
+	<navPoint id="ich00_fm01_title" playOrder="2">
+	<navLabel>
+	<text>Title Page</text>
+	</navLabel>
+	<content src="xhtml/  "/>
+	</navPoint>
+	ссылка на неопределённый элемент(страницу)
+
+	Решение: читалка это переваривает. Пока не разобрался, опасно ли это.
+
+4) Проблемы с кодировкой в оглавлении -- проблема отпала (косяк в оффлайн клиенте).
