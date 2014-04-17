@@ -9,6 +9,7 @@ import shutil
 
 class Maker(object):
     def __init__(self):
+        self.toc_folder = ""
         self.location = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
         self.onlyfiles = [f for f in listdir(self.location) if isfile(join(self.location, f))]
         print("\t--- Found {} files:".format(len(self.onlyfiles) - 1))
@@ -20,6 +21,7 @@ class Maker(object):
                 splitter = "."
                 epubNameWithoutFormat = epubnameWithFormat.split(splitter)[0]
                 htmlFolder = os.path.join(self.location, epubNameWithoutFormat + "/ops/xhtml/")
+                self.toc_folder = os.path.join(self.location, epubNameWithoutFormat + "/ops/")
                 inZipPath = os.path.join(self.location, epubNameWithoutFormat)
                 outZipPath = os.path.join(self.location, epubnameWithFormat)
 
@@ -42,6 +44,7 @@ class Maker(object):
             z.extractall(outputPath)
 
     def correctAllHtml(self, htmlFolder):
+        self.repair_toc_ncx()
         try:
             allHtmls = [f for f in listdir(htmlFolder) if isfile(join(htmlFolder, f))]
         except:
@@ -58,6 +61,24 @@ class Maker(object):
             except:
                 print("\t--- Skip file: {}".format(htmlName))
 
+    def repair_toc_ncx(self):
+        print('\t\t--- Repairing toc.ncx file...')
+        self.toc_folder = os.path.join(self.toc_folder, "toc.ncx")
+        try:
+            f = open(self.toc_folder, 'r', encoding='utf-8')
+        except:
+            print("\t\t--- ! toc.ncx not in ops directory")
+            self.toc_folder = os.path.join(self.toc_folder[:-11], "OEBPS/toc.ncx")
+            f = open(self.toc_folder, 'r', encoding='utf-8')
+        pattern = r'html(#.+?)"'
+        INPUT = f.read()
+        strings = re.findall(pattern, INPUT, flags=re.S)
+        for string in strings:
+            INPUT = INPUT.replace(string, "")
+        f.close()
+        f = open(self.toc_folder, 'w', encoding='utf-8')
+        f.write(INPUT)
+        f.close()
 
     def replace_svg_tags(self, filename):
         print('\t\t--- Replasing SVG Tags...')
@@ -130,6 +151,7 @@ class Maker(object):
             i += 1
         print('\t\t--- Correcting quotes...')
         INPUT = INPUT.replace("chap-bq", "right")
+        INPUT = INPUT.replace("&#8212;", " &#8212 ")
         f.close()
         f = open(os.path.join(self.location, filename), 'w', encoding='utf-8')
         f.write(INPUT)
