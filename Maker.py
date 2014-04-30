@@ -69,6 +69,15 @@ class Maker(object):
             self.html_folder = htmlFolder
             allHtmls = [f for f in listdir(htmlFolder) if isfile(join(htmlFolder, f))]
         self.repair_toc_ncx()
+
+        try:
+            allHtmls = [f for f in listdir(htmlFolder) if isfile(join(htmlFolder, f))]
+            self.html_folder = htmlFolder
+        except:
+            print("First try finding HTML directory failed. Second try...")
+            htmlFolder = os.path.join(htmlFolder[:-10], "OEBPS")
+            self.html_folder = htmlFolder
+            allHtmls = [f for f in listdir(htmlFolder) if isfile(join(htmlFolder, f))]
         # self.repair_toc_ncx_NOT_USED()
         for htmlName in allHtmls:
             print('\t--- Current file: {}'.format(htmlName))
@@ -77,6 +86,8 @@ class Maker(object):
                 self.replace_svg_tags(html)
                 self.replace_markers(html)
                 self.replace_headers(html)
+                if "css" in htmlName:
+                    os.remove(html)
             except:
                 print("\t--- Skip file: {}".format(htmlName))
 
@@ -150,7 +161,7 @@ class Maker(object):
                             lines.append(string)
                             main_id = old_line[1]
             if "" != new_lines:
-                if len(lines) > 1:
+                if len(lines) > 0:
                     lines = []
                     opfINPUT = opfINPUT.replace(old_line[0], new_lines)
                     opfINPUT = opfINPUT.replace(old_line[0], "")
@@ -167,13 +178,31 @@ class Maker(object):
                     toc_delete_pattern = '(<navPoint id="{}".+?<content src="(?:xhtml\/|).+?html"\s*\/>)'.format(ids[0])
                     ids = []
                     replacement = re.findall(toc_delete_pattern, INPUT, flags=re.S)
-                    INPUT = INPUT.replace(replacement[0],
-                                          '<navPoint id="test{}" playOrder="1">\n<navLabel>\n<text>Praise</text>\n</navLabel>\n<content src="bano_9781601638687_oeb_fm1_r1.html"/>'.format(
-                                              j))
-                    j += 1
+                    if len(lines) > 1:
+                        INPUT = INPUT.replace(replacement[0],
+                                              '<navPoint id="test{}" playOrder="1">\n<navLabel>\n<text>Praise</text>\n</navLabel>\n<content src="bano_9781601638687_oeb_fm1_r1.html"/>'.format(
+                                                  j))
+                        j += 1
                 new_lines = ""
                 lines = []
                 ids = []
+        try:
+            #удаление оглавления из книг (toc)
+            pattern = r'(<navPoint id="toc".+?<\/navPoint>)'
+            toc = re.findall(pattern, INPUT, re.S)
+            toc = toc[0]
+            INPUT = INPUT.replace(toc, "")
+        except:
+            print("\t\t\t--- Error deleting toc from toc.ncx")
+        try:
+            #удаление оглавления из книг (spine)
+            pattern = r'(<itemref idref="toc"\s*\/>)'
+            toc = re.findall(pattern, opfINPUT, re.S)
+            toc = toc[0]
+            opfINPUT = opfINPUT.replace(toc, "")
+        except:
+            print("\t\t\t--- Error deleting toc from spine")
+
         f.close()
         f = open(self.toc_folder, 'w', encoding='utf-8')
         # soup = BeautifulSoup(INPUT)
@@ -247,14 +276,17 @@ class Maker(object):
         name = filename.split(splitter)[0]
         INPUT = f.read()
         if "cover" in filename:
-            pattern = r'(<body.+?<\/p>)'
-            image_pattern = r'<body.+?src="(.+?)".+?<\/p>'
-            image = re.findall(image_pattern, INPUT, flags=re.S)
-            image = image[0]
-            new_string = '<body><div class="cover"><img alt="cover" height="95%" src="{}"/></div>'.format(image)
-            image_block = re.findall(pattern, INPUT, flags=re.S)
-            image_block = image_block[0]
-            INPUT = INPUT.replace(image_block, new_string)
+            try:
+                pattern = r'(<body.+?<\/p>)'
+                image_pattern = r'<body.+?src="(.+?)".+?<\/p>'
+                image = re.findall(image_pattern, INPUT, flags=re.S)
+                image = image[0]
+                new_string = '<body><div class="cover"><img alt="cover" height="95%" src="{}"/></div>'.format(image)
+                image_block = re.findall(pattern, INPUT, flags=re.S)
+                image_block = image_block[0]
+                INPUT = INPUT.replace(image_block, new_string)
+            except:
+                print("\t\t\t---Ecxeption svg tags")
         pattern = r'<svg:.+?href="(.+?)".+?svg>'
         strings = re.findall(pattern, INPUT, flags=re.S)
         i = 0
@@ -295,6 +327,37 @@ class Maker(object):
             # print(INPUT)
         print('\t\t--- Editing <ul> and <li> tags...')
         INPUT = INPUT.replace("</ul>\n<ul>", "\n")
+
+        pattern = r'(<div class="list\w">(.+?<\/div>)<\/div>)'
+        blocks = re.findall(pattern, INPUT, re.S)
+        for block in blocks:
+            old_block = block[0]
+            new_block = "<ul>" + block[1] + "</ul>"
+            pattern = r'(<div class="lsl\d"?>(.+?)<\/div>)'
+            li_blocks = re.findall(pattern, old_block, re.S)
+            for li_block in li_blocks:
+                new_li_block = "<li>" + li_block[1] + "</li>"
+                new_block = new_block.replace(li_block[0], new_li_block)
+            INPUT = INPUT.replace(old_block, new_block)
+        # и ещё они умудрились делать списки без обозначения того, что это списки
+        pattern = r'(<div class="lsl\d"?>(.+?)<\/div>)'
+        li_blocks = re.findall(pattern, INPUT, re.S)
+        for li_block in li_blocks:
+            new_li_block = "<ul><li>" + li_block[1] + "</li></ul>"
+            INPUT = INPUT.replace(li_block[0], new_li_block)
+
+        INPUT = INPUT.replace("&#x2022;", "")
+        INPUT = INPUT.replace("</ul>\n<ul>", "\n")
+        INPUT = INPUT.replace("</ul><ul>", "\n")
+        pattern = r'<li>(<img src=.+?\/>)'
+        images_in_li = re.findall(pattern, INPUT, re.S)
+        for image_in_li in images_in_li:
+            INPUT = INPUT.replace(image_in_li, "")
+        # удаление от <div> до </div>
+        pattern = r'(<div>(.+?)<\/div>)'
+        divs = re.findall(pattern, INPUT, re.S)
+        for div in divs:
+            INPUT = INPUT.replace(div[0], div[1])
         f.close()
         f = open(os.path.join(self.location, filename), 'w', encoding='utf-8')
         f.write(INPUT)
@@ -310,12 +373,12 @@ class Maker(object):
             pattern = r'<h. class="h(.)".+?\/h.>'
             pattern_full_message = r'(<h. class="h.".+?\/h.>)'
             INPUT = f.read()
-            strings = re.findall(pattern, INPUT)  # только текст
-            full_message = re.findall(pattern_full_message, INPUT)
+            strings = re.findall(pattern, INPUT, re.S)  # только текст
+            full_message = re.findall(pattern_full_message, INPUT, re.S)
             i = 0
             INPUT = INPUT.replace("h4", "h3")
             for text in full_message:
-                if int(strings[i]) == 2:
+                if int(strings[i]) == 2 or int(strings[i]) == 1:
                     new_message = '<div class="chapter_header">{!s}</div>'.format(text)
                     INPUT = INPUT.replace(text, new_message)
                 # if int(strings[i]) == 3:
@@ -327,6 +390,16 @@ class Maker(object):
             print('\t\t--- Correcting quotes...')
             INPUT = INPUT.replace("chap-bq", "right")
             INPUT = INPUT.replace("&#8212;", " &#8212 ")
+
+            pattern = r'(<div class="(?:tx|tx1|fmhT|fmtx|atx1|fmtx1|epiv|eps)">(<div class="(?:tx|tx1|fmhT|fmtx|atx1|fmtx1|epiv|eps)">)*(.+?)<\/div>.*?(<\/div>)*)'
+            divs = re.findall(pattern, INPUT, re.S)
+            for div in divs:
+                new_line = "<p>" + div[2] + "</p>"
+                INPUT = INPUT.replace(div[0], new_line)
+            divs = re.findall(pattern, INPUT, re.S)
+            for div in divs:
+                new_line = "<p>" + div[2] + "</p>"
+                INPUT = INPUT.replace(div[0], new_line)
             f.close()
             f = open(os.path.join(self.location, filename), 'w', encoding='utf-8')
             f.write(INPUT)
