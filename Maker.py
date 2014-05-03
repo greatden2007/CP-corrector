@@ -5,6 +5,7 @@ import zipfile
 from os import listdir
 from os.path import isfile, join
 from bs4 import BeautifulSoup
+import time
 import shutil
 
 
@@ -26,6 +27,7 @@ class Maker(object):
 
     def editEpub(self):
         i = 0
+        start_time = int(round(time.time()))
         for epubnameWithFormat in self.onlyfiles:
             try:
                 splitter = "."
@@ -50,7 +52,10 @@ class Maker(object):
                 i += 1
             except:
                 print("skip  " + epubnameWithFormat)
+        stop_time = int(round(time.time()))
+        delta = stop_time - start_time
         print("\t--- Done {} epubs".format(i))
+        print("Time: {}seconds, avg.time: {} ".format(delta, delta / i))
 
 
     def unarchiveEpub(self, archiveName, destinationFolderName):
@@ -114,14 +119,20 @@ class Maker(object):
 
         strings = re.findall(pattern, INPUT)
         i = 0
-        toc_id_pattern = r'<navPoint id="(.+?)".+?<content src="(?:xhtml\/|)(.+?html)\#*(.*?)"'
+        toc_id_pattern = r'<navPoint id="(.+?)".+?<content src="((?:x?html\/)*.+?html)\#*(.*?)"'
         old_ids_refs_parts = re.findall(toc_id_pattern, INPUT, flags=re.S)
-
         for chapter in strings:
             # self.ok = False
+            j = 0
+            chapters_for_current_file = []
             filename = chapter[1]
             part = chapter[2]
-            self.splitHTML(filename, part)
+            for chapter1 in strings:
+                if chapter1[1] == filename:
+                    j += 1
+                    chapters_for_current_file.append(chapter1[2])
+
+            self.splitHTML(filename, part, j, chapters_for_current_file)
             new_name = self.change_file_name(filename, part)
             old_str = filename + "#" + part
             INPUT = INPUT.replace(old_str, new_name, 1)
@@ -129,7 +140,7 @@ class Maker(object):
             # new_ids_refs_parts[self.toc_ids[i]] = new_name
             i += 1
 
-        toc_id_pattern = r'<navPoint id="(.+?)".+?<content src="(xhtml\/|)(.+?html)"'
+        toc_id_pattern = r'<navPoint id="(.+?)".+?<content src="((?:x?html\/)*.+?html)\#*(.*?)"'
         new_ids_refs_parts = re.findall(toc_id_pattern, INPUT, flags=re.S)
 
         f.close()
@@ -141,7 +152,7 @@ class Maker(object):
         #работа с 1/2 блоками в .opf + удаление информации из toc.ncx и .opf
         ids = []
         new_lines = ""
-        pattern = r'(<item id="(.+?)" href="(?:xhtml\/|)(.+?)" media-type=".+?"\s*\/>)'
+        pattern = r'(<item id="(.+?)"\n*\s*? href="(.+?)"\n*\s*? media-type=".+?"\s*\/>)'
         lines = []
         f = open(self.toc_folder, 'r', encoding='utf-8')
         INPUT = f.read()
@@ -155,25 +166,32 @@ class Maker(object):
                         if id_ref_part[0] == new_id_ref_part[0]:
                             #создаем новую строку и добавляем в массив новых строк
                             string = '<item id="{}" href="{}" media-type="application/xhtml+xml" />'.format(
-                                id_ref_part[0], new_id_ref_part[2])
+                                id_ref_part[0], new_id_ref_part[1])
                             new_lines += string + "\n"
                             ids.append(new_id_ref_part[0])
                             lines.append(string)
                             main_id = old_line[1]
             if "" != new_lines:
                 if len(lines) > 0:
-                    lines = []
                     opfINPUT = opfINPUT.replace(old_line[0], new_lines)
-                    opfINPUT = opfINPUT.replace(old_line[0], "")
+                    if len(lines) > 1:
+                        opfINPUT = opfINPUT.replace(old_line[0], "")
+                        line_another_format = old_line[0]
+                        line_another_format = line_another_format[:-2] + " />"
+                        opfINPUT = opfINPUT.replace(line_another_format, "")
                     new_lines = ""
                     ids_string = ""
                     # part 2
                     for part_id in ids:
                         ids_string += '<itemref idref="{}" />\n'.format(part_id)
                     opfINPUT = opfINPUT.replace('<itemref idref="{}" />'.format(main_id), ids_string)
-                    opfINPUT = opfINPUT.replace('<itemref idref="{}" />'.format(main_id), "")
+                    if len(lines) > 1:
+                        opfINPUT = opfINPUT.replace('<itemref idref="{}" />'.format(main_id), "")
                     opfINPUT = opfINPUT.replace('<itemref idref="{}"/>'.format(main_id), ids_string)
-                    opfINPUT = opfINPUT.replace('<itemref idref="{}"/>'.format(main_id), "")
+                    if len(lines) > 1:
+                        opfINPUT = opfINPUT.replace('<itemref idref="{}"/>'.format(main_id), "")
+                        # чтоб наверняка удалить main id
+                        opfINPUT = opfINPUT.replace('<itemref idref="{}" />'.format(main_id), "")
                     #удаление из toc.ncx
                     toc_delete_pattern = '(<navPoint id="{}".+?<content src="(?:xhtml\/|).+?html"\s*\/>)'.format(ids[0])
                     ids = []
@@ -183,6 +201,7 @@ class Maker(object):
                                               '<navPoint id="test{}" playOrder="1">\n<navLabel>\n<text>Praise</text>\n</navLabel>\n<content src="bano_9781601638687_oeb_fm1_r1.html"/>'.format(
                                                   j))
                         j += 1
+                    lines = []
                 new_lines = ""
                 lines = []
                 ids = []
@@ -190,16 +209,50 @@ class Maker(object):
             #удаление оглавления из книг (toc)
             pattern = r'(<navPoint id="toc".+?<\/navPoint>)'
             toc = re.findall(pattern, INPUT, re.S)
-            toc = toc[0]
-            INPUT = INPUT.replace(toc, "")
+            if len(toc) > 0:
+                toc = toc[0]
+                INPUT = INPUT.replace(toc, "")
+
+            # удаление файла, если он называется Contents
+            pattern = r'(<navP.+?>\n<navL.+?>\n<text>Contents<\/text>\n<\/navLabel>\n<content src="(.+?)"\/>\n<\/navPoint>)'
+            found = re.findall(pattern, INPUT)
+            if len(found) > 0:
+                found = found[0]
+                toc = found[0]
+                ref = found[1]
+                INPUT = INPUT.replace(toc, "")
+
+            # и если Table of Contents
+            pattern = r'(<navP.+?>\n*?<navL.+?>\n*?<text>Table of Contents<\/text>\n*?<\/navLabel>\n*?<content src="(.+?)"\/>\n*?<\/navPoint>)'
+            found = re.findall(pattern, INPUT)
+            if len(found) > 0:
+                found = found[0]
+                toc = found[0]
+                ref = found[1]
+                INPUT = INPUT.replace(toc, "")
+
         except:
             print("\t\t\t--- Error deleting toc from toc.ncx")
         try:
             #удаление оглавления из книг (spine)
             pattern = r'(<itemref idref="toc"\s*\/>)'
             toc = re.findall(pattern, opfINPUT, re.S)
-            toc = toc[0]
-            opfINPUT = opfINPUT.replace(toc, "")
+            if len(toc) > 0:
+                toc = toc[0]
+                opfINPUT = opfINPUT.replace(toc, "")
+
+            pattern = r'(<item id="(.+?)" href="{}" media-type="application/xhtml\+xml"\s*/>)'.format(ref)
+            found = re.findall(pattern, opfINPUT)
+            if len(found) > 0:
+                found = found[0]
+                opf1 = found[0]
+                id = found[1]
+                opfINPUT = opfINPUT.replace(opf1, "")
+                pattern = r'(<itemref idref="{}"\s*\/>)'.format(id)
+                opf2 = re.findall(pattern, opfINPUT)
+                if len(opf2) > 0:
+                    opf2 = opf2[0]
+                    opfINPUT = opfINPUT.replace(opf2, "")
         except:
             print("\t\t\t--- Error deleting toc from spine")
 
@@ -216,32 +269,191 @@ class Maker(object):
         opfFile.close()
 
 
-    def splitHTML(self, filename, splitter):
-        f = open(os.path.join(self.html_folder, filename), 'r', encoding='utf-8')
-        pattern = r'<\w+?><a id="(.+?)"\s*\/>\s*<\/\w+>(.+?)(?=<\w+?><a id=".+?"\s*\/>\s*<\/\w+>|<\/body>)'
-        head_pattern = r'(.+?)<body>'
-        content = ""
-        INPUT = f.read()
-        head = re.match(head_pattern, INPUT, flags=re.S)
-        head = head.group(0)
-        contents = re.findall(pattern, INPUT, flags=re.S)
-        if len(contents) == 0:
-            pattern = r'<a id="(.+?)".+?\/a>(.+?)(?=<a id=".+?".+?\/a>|<\/body>)'
-            contents = re.findall(pattern, INPUT, flags=re.S)
-        for content_group in contents:
-            if splitter == content_group[0]:
-                content = content_group[1]
-        if len(content) < 2:
-            return
-        end = "</body>\n</html>"
-        OUTPUT = head + content + end
-        f.close()
-        dot_splitter = "."
-        file = filename.split(dot_splitter)
-        new_file = file[0] + splitter + "." + file[1]
-        f = open(os.path.join(self.html_folder, new_file), 'w', encoding='utf-8')
-        f.write(OUTPUT)
-        f.close()
+    def splitHTML(self, filename, splitter, count, chapters_for_file):
+        # выбирается массив всех глав в файле и ищутся две главы с соседними именами
+        # или, если эта глава единственная/последняя, то берётся весь файл до тега </body>
+        # текущая глава -- splitter;
+        # следующая глава: chapters_for_file[chapters_for_file.index(splitter)+1]
+        current_chapter = splitter
+        for chapter in chapters_for_file:
+            if splitter == chapter:
+                if chapters_for_file.index(splitter) != len(chapters_for_file) - 1:
+
+                    next_chapter = chapters_for_file[chapters_for_file.index(splitter) + 1]
+
+                    f = open(os.path.join(self.html_folder, filename), 'r', encoding='utf-8')
+                    pattern = r'(<\w+?><a id="({})"\s*\/>\s*<\/\w+>.+?(?=<\w+?><a id="{}"\s*\/>\s*<\/\w+>))'.format(current_chapter, next_chapter)
+                    head_pattern = r'(.+?)<body>'
+                    INPUT = f.read()
+                    head = re.match(head_pattern, INPUT, flags=re.S)
+                    head = head.group(0)
+                    contents = re.findall(pattern, INPUT, flags=re.S)
+
+                    additional_contents1 = []
+                    additional_contents2 = []
+                    additional_contents3 = []
+                    additional_contents4 = []
+                    additional_contents5 = []
+                    additional_contents6 = []
+                    additional_contents7 = []
+                    content = ""
+
+                    #(?:<a id=".+?".+?\/a>)*<a id="(.+?)".+?\/a>(.+?)(?=<a id=".+?".+?\/a>|<\/body>)
+                    additional_contents_pattern1 = r'(<a id="({})".+?\/a>(.+?)(?=<a id="{}".+?\/a>))'.format(current_chapter, next_chapter)
+                    additional_contents1 = re.findall(additional_contents_pattern1, INPUT, flags=re.S)
+
+                    additional_contents_pattern9 = r'(<h. class="h..*?".+?<a id="({})".+?\/a>(.+?)(?=<h. class="h..*?".+?<a id="{}".+?\/a>))'.format(current_chapter, next_chapter)
+                    additional_contents9 = re.findall(additional_contents_pattern9, INPUT, re.S)
+
+                    # ch##lev#
+                    additional_contents_pattern2 = r'(<a id="({})".+?\/a>(.+?)(?=<a id="{}".+?\/a>))'.format(current_chapter, next_chapter)
+                    additional_contents2 = re.findall(additional_contents_pattern2, INPUT, re.S)
+
+                    # <h# class="h#" id="??"
+                    additional_contents_pattern3 = r'(<h\d class="h..*?" id="({})">(.+?)(?=<h\d class="h..*?" id="{}"))'.format(current_chapter, next_chapter)
+                    additional_contents3 = re.findall(additional_contents_pattern3, INPUT, re.S)
+
+                    # ch02a
+                    additional_contents_pattern4 = r'(<a id="ch\w+?"><\/a><a id="({})"><\/a>(.+?)(?:<a id="{}".+?\/a>))'.format(current_chapter, next_chapter)
+                    additional_contents4 = re.findall(additional_contents_pattern4, INPUT, re.S)
+
+                    additional_contents_pattern5 = r'(<a id="page\w+?"><\/a><a id="({})"><\/a>(.+?)(?=<a id="{}".+?\/a>))'.format(current_chapter, next_chapter)
+                    additional_contents5 = re.findall(additional_contents_pattern5, INPUT, re.S)
+
+                    additional_contents_pattern6 = r'(<a id="ch.+?".+?\/a><a id="({})".+?<\/a>(.+?)(?=<a id="{}".+?\/a>))'.format(current_chapter, next_chapter)
+                    additional_contents6 = re.findall(additional_contents_pattern6, INPUT, re.S)
+
+                    additional_contents_pattern8 = r'(<h. class="h..*<a id="page\w+?"><\/a><a id="{}"><\/a>(.+?)(?=<a id="{}".+?\/a>))'.format(current_chapter, next_chapter)
+                    additional_contents8 = re.findall(additional_contents_pattern8, INPUT, re.S)
+
+                    additional_contents_pattern10 = r'(<p id="({})" class=".+?">(.+?)(?=<p id="{}" class=".+?">))'.format(current_chapter, next_chapter)
+                    additional_contents10 = re.findall(additional_contents_pattern10, INPUT, re.S)
+
+                    additional_contents_pattern11 = r'(<p class=".+?" id="({})">.+?(?=<p class=".+?" id="{}">))'.format(current_chapter, next_chapter)
+                    additional_contents11 = re.findall(additional_contents_pattern11, INPUT, re.S)
+
+                    contents += additional_contents1 + additional_contents2 + additional_contents3 + additional_contents4 + additional_contents5 + additional_contents6 + additional_contents8 + additional_contents9 + additional_contents10 + additional_contents11
+                    for content_group in contents:
+                        if splitter == content_group[0]:
+                            content = content_group[1]
+                    if content == "":
+                        for content_group in contents:
+                            if splitter == content_group[1]:
+                                content = content_group[0]
+                    if content == "":
+                        additional_contents_pattern7 = r'(<a id="lev.+?".+?<\/a><a id="({})".+?<\/a>(.+?)(?=<a id="{}".+?\/a>))'.format(current_chapter, next_chapter)
+                        additional_contents7 = re.findall(additional_contents_pattern7, INPUT, re.S)
+                        for content_group in additional_contents7:
+                            if splitter == content_group[0]:
+                                content = content_group[1]
+
+                    # пробегаемся по всем id и если такой в контенте нет, то добавляем контент по этой id
+                    # for content_group in contents:
+                    #     if not content_group[0] in content:
+                    #         content += content_group[1]
+                    if count == 1:
+                        for content_group in contents:
+                            if not content_group[1] in content:
+                                content += content_group[0]
+
+                    end = "</body>\n</html>"
+                    OUTPUT = head + content + end
+                    f.close()
+                    dot_splitter = "."
+                    file = filename.split(dot_splitter)
+                    new_file = file[0] + splitter + "." + file[1]
+                    f = open(os.path.join(self.html_folder, new_file), 'w', encoding='utf-8')
+                    f.write(OUTPUT)
+                    f.close()
+                # если глава -- последняя или единственная
+                # то берём всё от её начала до тега </body>
+                else:
+                    f = open(os.path.join(self.html_folder, filename), 'r', encoding='utf-8')
+                    pattern = r'(<\w+?><a id="({})"\s*\/>\s*<\/\w+>.+?(?=<\/body>))'.format(current_chapter)
+                    head_pattern = r'(.+?)<body>'
+                    INPUT = f.read()
+                    head = re.match(head_pattern, INPUT, flags=re.S)
+                    head = head.group(0)
+                    contents = re.findall(pattern, INPUT, flags=re.S)
+
+                    additional_contents1 = []
+                    additional_contents2 = []
+                    additional_contents3 = []
+                    additional_contents4 = []
+                    additional_contents5 = []
+                    additional_contents6 = []
+                    additional_contents7 = []
+                    content = ""
+
+                    #(?:<a id=".+?".+?\/a>)*<a id="(.+?)".+?\/a>(.+?)(?=<a id=".+?".+?\/a>|<\/body>)
+                    additional_contents_pattern1 = r'(<a id="({})".+?\/a>(.+?)(?=<\/body>))'.format(current_chapter)
+                    additional_contents1 = re.findall(additional_contents_pattern1, INPUT, flags=re.S)
+
+                    additional_contents_pattern9 = r'(<h. class="h..*?".+?<a id="({})".+?\/a>(.+?)(?=<\/body>))'.format(current_chapter)
+                    additional_contents9 = re.findall(additional_contents_pattern9, INPUT, re.S)
+
+                    # ch##lev#
+                    additional_contents_pattern2 = r'(<a id="({})".+?\/a>(.+?)(?=<\/body>))'.format(current_chapter)
+                    additional_contents2 = re.findall(additional_contents_pattern2, INPUT, re.S)
+
+                    # <h# class="h#" id="??"
+                    additional_contents_pattern3 = r'(<h\d class="h..*?" id="({})">(.+?)(?=<\/body>))'.format(current_chapter)
+                    additional_contents3 = re.findall(additional_contents_pattern3, INPUT, re.S)
+
+                    # ch02a
+                    additional_contents_pattern4 = r'(<a id="ch\w+?"><\/a><a id="({})"><\/a>(.+?)(?:<\/body>))'.format(current_chapter)
+                    additional_contents4 = re.findall(additional_contents_pattern4, INPUT, re.S)
+
+                    additional_contents_pattern5 = r'(<a id="page\w+?"><\/a><a id="({})"><\/a>(.+?)(?=<\/body>))'.format(current_chapter)
+                    additional_contents5 = re.findall(additional_contents_pattern5, INPUT, re.S)
+
+                    additional_contents_pattern6 = r'(<a id="ch.+?".+?\/a><a id="({})".+?<\/a>(.+?)(?=<\/body>))'.format(current_chapter)
+                    additional_contents6 = re.findall(additional_contents_pattern6, INPUT, re.S)
+
+                    additional_contents_pattern8 = r'(<h. class="h..*<a id="page\w+?"><\/a><a id="({})"><\/a>(.+?)(?=<\/body>))'.format(current_chapter)
+                    additional_contents8 = re.findall(additional_contents_pattern8, INPUT, re.S)
+
+                    additional_contents_pattern10 = r'(<p id="({})" class=".+?">.+?(?=<\/body>))'.format(current_chapter)
+                    additional_contents10 = re.findall(additional_contents_pattern10, INPUT, re.S)
+
+                    additional_contents_pattern11 = r'(<p class=".+?" id="({})">.+?(?=<\/body>))'.format(current_chapter)
+                    additional_contents11 = re.findall(additional_contents_pattern11, INPUT, re.S)
+
+                    contents += additional_contents1 + additional_contents2 + additional_contents3 + additional_contents4 + additional_contents5 + additional_contents6 + additional_contents8 + additional_contents9 + additional_contents10 + additional_contents11
+                    for content_group in contents:
+                        if splitter == content_group[0]:
+                            content = content_group[1]
+                    if content == "":
+                        for content_group in contents:
+                            if splitter == content_group[1]:
+                                content = content_group[0]
+                    if content == "":
+                        additional_contents_pattern7 = r'<a id="lev.+?".+?<\/a><a id="({})".+?<\/a>(.+?)(?=<\/body>)'.format(current_chapter)
+                        additional_contents7 = re.findall(additional_contents_pattern7, INPUT, re.S)
+                        for content_group in additional_contents7:
+                            if splitter == content_group[0]:
+                                content = content_group[1]
+
+                    # пробегаемся по всем id и если такой в контенте нет, то добавляем контент по этой id
+                    # for content_group in contents:
+                    #     if not content_group[0] in content:
+                    #         content += content_group[1]
+                    if count == 1:
+                        for content_group in contents:
+                            if not content_group[1] in content:
+                                content += content_group[0]
+
+                    end = "</body>\n</html>"
+                    OUTPUT = head + content + end
+                    f.close()
+                    dot_splitter = "."
+                    file = filename.split(dot_splitter)
+                    new_file = file[0] + splitter + "." + file[1]
+                    f = open(os.path.join(self.html_folder, new_file), 'w', encoding='utf-8')
+                    f.write(OUTPUT)
+                    f.close()
+                if content == "":
+                    print("Not enough data to split HTML. file: {} with chapter {}".format(filename, splitter))
 
     def change_file_name(self, old_name, chapter_name):
         dot_splitter = "."
@@ -275,7 +487,7 @@ class Maker(object):
         splitter = "."
         name = filename.split(splitter)[0]
         INPUT = f.read()
-        if "cover" in filename:
+        if "cover" in filename or "tp" in filename:
             try:
                 pattern = r'(<body.+?<\/p>)'
                 image_pattern = r'<body.+?src="(.+?)".+?<\/p>'
@@ -312,12 +524,17 @@ class Maker(object):
     def replace_markers(self, filename):
         print('\t\t--- Replasing Markers...')
         f = open(os.path.join(self.location, filename), mode='r', encoding='utf-8')
-        pattern = r'<p class=".+?><img.+?"\/>(.+?)<\/p>'
-        pattern_full_message = r'(<p class=".+?><img.+?"\/>.+?<\/p>)'
+        pattern = r'<p class="list\w+?">\n*\s*?<img.+?\/>(.+?)<\/p>'
+        pattern_full_message = r'(<p class="list\w+?">\n*\s*?<img.+?\/>.+?<\/p>)'
         INPUT = f.read()
         # print(INPUT)
-        full_messages = re.findall(pattern_full_message, INPUT)  # строки целиком вместе с тегами
-        strings = re.findall(pattern, INPUT)  # только текст
+        full_messages = re.findall(pattern_full_message, INPUT, re.S)  # строки целиком вместе с тегами
+        strings = re.findall(pattern, INPUT, re.S)  # только текст
+        if len(full_messages) == 0 or len(strings) == 0:
+            pattern = r'<p class="list\w*">\n*?\s*?<img.+?<\/img>(.+?)<\/p>'
+            pattern_full_message = r'(<p class="list\w*">\n*?\s*?<img.+?<\/img>.+?<\/p>)'
+            full_messages = re.findall(pattern_full_message, INPUT, re.S)  # строки целиком вместе с тегами
+            strings = re.findall(pattern, INPUT, re.S)  # только текст
         i = 0
         correctStrings = []  # исправленные строки с тегами
         for text in strings:
@@ -370,15 +587,17 @@ class Maker(object):
         print('\t\t--- Replasing headers...')
         if not "ncx" in filename and not "opf" in filename:
             f = open(os.path.join(self.location, filename), 'r', encoding='utf-8')
-            pattern = r'<h. class="h(.)".+?\/h.>'
-            pattern_full_message = r'(<h. class="h.".+?\/h.>)'
+            pattern = r'<h(.) class="h..*?".+?\/h.>'
+            pattern_full_message = r'(<h. class="h..*?".+?\/h.>)'
             INPUT = f.read()
+            soup = BeautifulSoup(INPUT)
+            INPUT = soup.prettify()
+            INPUT = INPUT.replace("h4", "h3")
             strings = re.findall(pattern, INPUT, re.S)  # только текст
             full_message = re.findall(pattern_full_message, INPUT, re.S)
             i = 0
-            INPUT = INPUT.replace("h4", "h3")
             for text in full_message:
-                if int(strings[i]) == 2 or int(strings[i]) == 1:
+                if int(strings[i]) == 2 or int(strings[i]) == 1 or int(strings[i]) == 3:
                     new_message = '<div class="chapter_header">{!s}</div>'.format(text)
                     INPUT = INPUT.replace(text, new_message)
                 # if int(strings[i]) == 3:
@@ -390,8 +609,9 @@ class Maker(object):
             print('\t\t--- Correcting quotes...')
             INPUT = INPUT.replace("chap-bq", "right")
             INPUT = INPUT.replace("&#8212;", " &#8212 ")
+            INPUT = INPUT.replace("•", "")
 
-            pattern = r'(<div class="(?:tx|tx1|fmhT|fmtx|atx1|fmtx1|epiv|eps)">(<div class="(?:tx|tx1|fmhT|fmtx|atx1|fmtx1|epiv|eps)">)*(.+?)<\/div>.*?(<\/div>)*)'
+            pattern = r'(<div class="(?:tx|tx1|fmhT|fmtx|atx1|fmtx1|epiv|eps|ctag1|pepiv|peps|ct|cepiv|ceps|fmtx1d|bmtx|bmhT|ctl)">(<div class="(?:tx|tx1|fmhT|fmtx|atx1|fmtx1|epiv|eps|ctag1|pepiv|peps|ct|cepiv|ceps|fmtx1d|bmtx|bmhT|ctl)">)*(.+?)<\/div>.*?(<\/div>)*)'
             divs = re.findall(pattern, INPUT, re.S)
             for div in divs:
                 new_line = "<p>" + div[2] + "</p>"
@@ -400,6 +620,13 @@ class Maker(object):
             for div in divs:
                 new_line = "<p>" + div[2] + "</p>"
                 INPUT = INPUT.replace(div[0], new_line)
+
+            pattern = r'(<p class="(?:tx|tx1|fmhT|fmtx|atx1|fmtx1|epiv|eps|ctag1|pepiv|peps|ct|cepiv|ceps|fmtx1d|bmtx|bmhT|ctl)" .+?>(.+?)<\/p>)'
+            lines = re.findall(pattern, INPUT, re.S)
+            for line in lines:
+                old = line[0]
+                new = "<p>" + line[1] + "</p>"
+                INPUT = INPUT.replace(old, new)
             f.close()
             f = open(os.path.join(self.location, filename), 'w', encoding='utf-8')
             f.write(INPUT)
