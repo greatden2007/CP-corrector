@@ -277,7 +277,117 @@ class Maker(object):
         current_chapter = splitter
         for chapter in chapters_for_file:
             if splitter == chapter:
-                if chapters_for_file.index(splitter) != len(chapters_for_file) - 1:
+
+                # если глава первая,
+                # то взять всё от начала документа (тега <body> до второй главы)
+                if chapters_for_file.index(splitter) == 0 and len(chapters_for_file) > 0:
+                    content = ""
+                    # если состоит из одной главы
+                    if len(chapters_for_file) == 1:
+                        f = open(os.path.join(self.html_folder, filename), 'r', encoding='utf-8')
+                        INPUT = f.read()
+
+                        pattern = r'<body>(.+?)</body>'
+                        content = re.findall(pattern, INPUT, re.S)
+                        head_pattern = r'(.+?)<body>'
+                        head = re.match(head_pattern, INPUT, flags=re.S)
+                        head = head.group(0)
+                        end = "</body>\n</html>"
+                        if len(content[0]) > 0:
+                            OUTPUT = head + content[0] + end
+                            f.close()
+                            dot_splitter = "."
+                            file = filename.split(dot_splitter)
+                            new_file = file[0] + splitter + "." + file[1]
+                            f = open(os.path.join(self.html_folder, new_file), 'w', encoding='utf-8')
+                            f.write(OUTPUT)
+                            f.close()
+                    else:
+                        next_chapter = chapters_for_file[chapters_for_file.index(splitter) + 1]
+
+                        f = open(os.path.join(self.html_folder, filename), 'r', encoding='utf-8')
+                        pattern = r'<body>(.+?(?=<\w+?><a id="{}"\s*\/>\s*<\/\w+>))'.format(next_chapter)
+                        head_pattern = r'(.+?)<body>'
+                        INPUT = f.read()
+                        head = re.match(head_pattern, INPUT, flags=re.S)
+                        head = head.group(0)
+                        contents = re.findall(pattern, INPUT, flags=re.S)
+
+                        if len(contents) == 0:
+                            #(?:<a id=".+?".+?\/a>)*<a id="(.+?)".+?\/a>(.+?)(?=<a id=".+?".+?\/a>|<\/body>)
+                            additional_contents_pattern1 = r'<body>(.+?(?=<a id="{}".+?\/a>))'.format(next_chapter)
+                            additional_contents1 = re.findall(additional_contents_pattern1, INPUT, flags=re.S)
+                            contents += additional_contents1
+
+                        if len(contents) == 0:
+                            additional_contents_pattern9 = r'<body>(.+?(?=<h. class="h..*?".+?<a id="{}".+?\/a>))'.format(next_chapter)
+                            additional_contents9 = re.findall(additional_contents_pattern9, INPUT, re.S)
+                            contents += additional_contents9
+
+                        if len(contents) == 0:
+                            additional_contents_pattern2 = r'<body>(.+?(?=<a id="{}".+?\/a>))'.format(next_chapter)
+                            additional_contents2 = re.findall(additional_contents_pattern2, INPUT, re.S)
+                            contents += additional_contents2
+
+                        if len(contents) == 0:
+                            # <h# class="h#" id="??"
+                            additional_contents_pattern3 = r'<body>(.+?(?=<h\d class="h..*?" id="{}"))'.format(next_chapter)
+                            additional_contents3 = re.findall(additional_contents_pattern3, INPUT, re.S)
+                            contents += additional_contents3
+
+                        if len(contents) == 0:
+                            # ch02a
+                            additional_contents_pattern4 = r'<body>(.+?(?:<a id="{}".+?\/a>))'.format(next_chapter)
+                            additional_contents4 = re.findall(additional_contents_pattern4, INPUT, re.S)
+                            contents += additional_contents4
+
+                        if len(contents) == 0:
+                            additional_contents_pattern5 = r'<body>(.+?(?=<a id="{}".+?\/a>))'.format(next_chapter)
+                            additional_contents5 = re.findall(additional_contents_pattern5, INPUT, re.S)
+                            contents += additional_contents5
+
+                        if len(contents) == 0:
+                            additional_contents_pattern6 = r'<body>(.+?(?=<a id="{}".+?\/a>))'.format(next_chapter)
+                            additional_contents6 = re.findall(additional_contents_pattern6, INPUT, re.S)
+                            contents += additional_contents6
+
+                        if len(contents) == 0:
+                            additional_contents_pattern8 = r'<body>(.+?(?=<a id="{}".+?\/a>))'.format(next_chapter)
+                            additional_contents8 = re.findall(additional_contents_pattern8, INPUT, re.S)
+                            contents += additional_contents8
+
+                        if len(contents) == 0:
+                            additional_contents_pattern10 = r'<body>(.+?(?=<p id="{}" class=".+?">))'.format(next_chapter)
+                            additional_contents10 = re.findall(additional_contents_pattern10, INPUT, re.S)
+                            contents += additional_contents10
+
+                        if len(contents) == 0:
+                            additional_contents_pattern11 = r'<body>(.+?(?=<p class=".+?" id="{}">))'.format(next_chapter)
+                            additional_contents11 = re.findall(additional_contents_pattern11, INPUT, re.S)
+                            contents += additional_contents11
+
+                        for content_group in contents:
+                            if len(content_group) > 1:
+                                content = content_group
+                                break
+                        if content == "":
+                            additional_contents_pattern7 = r'<body>(.+?(?=<a id="{}".+?\/a>))'.format(next_chapter)
+                            additional_contents7 = re.findall(additional_contents_pattern7, INPUT, re.S)
+                            for content_group in additional_contents7:
+                                if len(content_group) > 1:
+                                    content = content_group
+                                    break
+
+                        end = "</body>\n</html>"
+                        OUTPUT = head + content + end
+                        f.close()
+                        dot_splitter = "."
+                        file = filename.split(dot_splitter)
+                        new_file = file[0] + splitter + "." + file[1]
+                        f = open(os.path.join(self.html_folder, new_file), 'w', encoding='utf-8')
+                        f.write(OUTPUT)
+                        f.close()
+                elif chapters_for_file.index(splitter) != len(chapters_for_file) - 1:
 
                     next_chapter = chapters_for_file[chapters_for_file.index(splitter) + 1]
 
@@ -289,63 +399,78 @@ class Maker(object):
                     head = head.group(0)
                     contents = re.findall(pattern, INPUT, flags=re.S)
 
-                    additional_contents1 = []
-                    additional_contents2 = []
-                    additional_contents3 = []
-                    additional_contents4 = []
-                    additional_contents5 = []
-                    additional_contents6 = []
-                    additional_contents7 = []
                     content = ""
 
-                    #(?:<a id=".+?".+?\/a>)*<a id="(.+?)".+?\/a>(.+?)(?=<a id=".+?".+?\/a>|<\/body>)
-                    additional_contents_pattern1 = r'(<a id="({})".+?\/a>(.+?)(?=<a id="{}".+?\/a>))'.format(current_chapter, next_chapter)
-                    additional_contents1 = re.findall(additional_contents_pattern1, INPUT, flags=re.S)
+                    if len(contents) == 0:
+                        #(?:<a id=".+?".+?\/a>)*<a id="(.+?)".+?\/a>(.+?)(?=<a id=".+?".+?\/a>|<\/body>)
+                        additional_contents_pattern1 = r'(<a id="({})".+?\/a>(.+?)(?=<a id="{}".+?\/a>))'.format(current_chapter, next_chapter)
+                        additional_contents1 = re.findall(additional_contents_pattern1, INPUT, flags=re.S)
+                        contents += additional_contents1
 
-                    additional_contents_pattern9 = r'(<h. class="h..*?".+?<a id="({})".+?\/a>(.+?)(?=<h. class="h..*?".+?<a id="{}".+?\/a>))'.format(current_chapter, next_chapter)
-                    additional_contents9 = re.findall(additional_contents_pattern9, INPUT, re.S)
+                    if len(contents) == 0:
+                        additional_contents_pattern9 = r'(<h. class="h..*?".+?<a id="({})".+?\/a>(.+?)(?=<h. class="h..*?".+?<a id="{}".+?\/a>))'.format(current_chapter, next_chapter)
+                        additional_contents9 = re.findall(additional_contents_pattern9, INPUT, re.S)
+                        contents += additional_contents9
 
-                    # ch##lev#
-                    additional_contents_pattern2 = r'(<a id="({})".+?\/a>(.+?)(?=<a id="{}".+?\/a>))'.format(current_chapter, next_chapter)
-                    additional_contents2 = re.findall(additional_contents_pattern2, INPUT, re.S)
+                    if len(contents) == 0:
+                        # ch##lev#
+                        additional_contents_pattern2 = r'(<a id="({})".+?\/a>(.+?)(?=<a id="{}".+?\/a>))'.format(current_chapter, next_chapter)
+                        additional_contents2 = re.findall(additional_contents_pattern2, INPUT, re.S)
+                        contents += additional_contents2
 
-                    # <h# class="h#" id="??"
-                    additional_contents_pattern3 = r'(<h\d class="h..*?" id="({})">(.+?)(?=<h\d class="h..*?" id="{}"))'.format(current_chapter, next_chapter)
-                    additional_contents3 = re.findall(additional_contents_pattern3, INPUT, re.S)
+                    if len(contents) == 0:
+                        # <h# class="h#" id="??"
+                        additional_contents_pattern3 = r'(<h\d class="h..*?" id="({})">(.+?)(?=<h\d class="h..*?" id="{}"))'.format(current_chapter, next_chapter)
+                        additional_contents3 = re.findall(additional_contents_pattern3, INPUT, re.S)
+                        contents += additional_contents3
 
-                    # ch02a
-                    additional_contents_pattern4 = r'(<a id="ch\w+?"><\/a><a id="({})"><\/a>(.+?)(?:<a id="{}".+?\/a>))'.format(current_chapter, next_chapter)
-                    additional_contents4 = re.findall(additional_contents_pattern4, INPUT, re.S)
+                    if len(contents) == 0:
+                        # ch02a
+                        additional_contents_pattern4 = r'(<a id="ch\w+?"><\/a><a id="({})"><\/a>(.+?)(?:<a id="{}".+?\/a>))'.format(current_chapter, next_chapter)
+                        additional_contents4 = re.findall(additional_contents_pattern4, INPUT, re.S)
+                        contents += additional_contents4
 
-                    additional_contents_pattern5 = r'(<a id="page\w+?"><\/a><a id="({})"><\/a>(.+?)(?=<a id="{}".+?\/a>))'.format(current_chapter, next_chapter)
-                    additional_contents5 = re.findall(additional_contents_pattern5, INPUT, re.S)
+                    if len(contents) == 0:
+                        additional_contents_pattern5 = r'(<a id="page\w+?"><\/a><a id="({})"><\/a>(.+?)(?=<a id="{}".+?\/a>))'.format(current_chapter, next_chapter)
+                        additional_contents5 = re.findall(additional_contents_pattern5, INPUT, re.S)
+                        contents += additional_contents5
 
-                    additional_contents_pattern6 = r'(<a id="ch.+?".+?\/a><a id="({})".+?<\/a>(.+?)(?=<a id="{}".+?\/a>))'.format(current_chapter, next_chapter)
-                    additional_contents6 = re.findall(additional_contents_pattern6, INPUT, re.S)
+                    if len(contents) == 0:
+                        additional_contents_pattern6 = r'(<a id="ch.+?".+?\/a><a id="({})".+?<\/a>(.+?)(?=<a id="{}".+?\/a>))'.format(current_chapter, next_chapter)
+                        additional_contents6 = re.findall(additional_contents_pattern6, INPUT, re.S)
+                        contents += additional_contents6
 
-                    additional_contents_pattern8 = r'(<h. class="h..*<a id="page\w+?"><\/a><a id="{}"><\/a>(.+?)(?=<a id="{}".+?\/a>))'.format(current_chapter, next_chapter)
-                    additional_contents8 = re.findall(additional_contents_pattern8, INPUT, re.S)
+                    if len(contents) == 0:
+                        additional_contents_pattern8 = r'(<h. class="h..*<a id="page\w+?"><\/a><a id="{}"><\/a>(.+?)(?=<a id="{}".+?\/a>))'.format(current_chapter, next_chapter)
+                        additional_contents8 = re.findall(additional_contents_pattern8, INPUT, re.S)
+                        contents += additional_contents8
 
-                    additional_contents_pattern10 = r'(<p id="({})" class=".+?">(.+?)(?=<p id="{}" class=".+?">))'.format(current_chapter, next_chapter)
-                    additional_contents10 = re.findall(additional_contents_pattern10, INPUT, re.S)
+                    if len(contents) == 0:
+                        additional_contents_pattern10 = r'(<p id="({})" class=".+?">(.+?)(?=<p id="{}" class=".+?">))'.format(current_chapter, next_chapter)
+                        additional_contents10 = re.findall(additional_contents_pattern10, INPUT, re.S)
+                        contents += additional_contents10
 
-                    additional_contents_pattern11 = r'(<p class=".+?" id="({})">.+?(?=<p class=".+?" id="{}">))'.format(current_chapter, next_chapter)
-                    additional_contents11 = re.findall(additional_contents_pattern11, INPUT, re.S)
+                    if len(contents) == 0:
+                        additional_contents_pattern11 = r'(<p class=".+?" id="({})">.+?(?=<p class=".+?" id="{}">))'.format(current_chapter, next_chapter)
+                        additional_contents11 = re.findall(additional_contents_pattern11, INPUT, re.S)
+                        contents += additional_contents11
 
-                    contents += additional_contents1 + additional_contents2 + additional_contents3 + additional_contents4 + additional_contents5 + additional_contents6 + additional_contents8 + additional_contents9 + additional_contents10 + additional_contents11
                     for content_group in contents:
                         if splitter == content_group[0]:
                             content = content_group[1]
+                            break
                     if content == "":
                         for content_group in contents:
                             if splitter == content_group[1]:
                                 content = content_group[0]
+                                break
                     if content == "":
                         additional_contents_pattern7 = r'(<a id="lev.+?".+?<\/a><a id="({})".+?<\/a>(.+?)(?=<a id="{}".+?\/a>))'.format(current_chapter, next_chapter)
                         additional_contents7 = re.findall(additional_contents_pattern7, INPUT, re.S)
                         for content_group in additional_contents7:
                             if splitter == content_group[0]:
                                 content = content_group[1]
+                                break
 
                     # пробегаемся по всем id и если такой в контенте нет, то добавляем контент по этой id
                     # for content_group in contents:
@@ -365,7 +490,7 @@ class Maker(object):
                     f = open(os.path.join(self.html_folder, new_file), 'w', encoding='utf-8')
                     f.write(OUTPUT)
                     f.close()
-                # если глава -- последняя или единственная
+                # если глава последняя
                 # то берём всё от её начала до тега </body>
                 else:
                     f = open(os.path.join(self.html_folder, filename), 'r', encoding='utf-8')
@@ -376,63 +501,78 @@ class Maker(object):
                     head = head.group(0)
                     contents = re.findall(pattern, INPUT, flags=re.S)
 
-                    additional_contents1 = []
-                    additional_contents2 = []
-                    additional_contents3 = []
-                    additional_contents4 = []
-                    additional_contents5 = []
-                    additional_contents6 = []
-                    additional_contents7 = []
                     content = ""
 
-                    #(?:<a id=".+?".+?\/a>)*<a id="(.+?)".+?\/a>(.+?)(?=<a id=".+?".+?\/a>|<\/body>)
-                    additional_contents_pattern1 = r'(<a id="({})".+?\/a>(.+?)(?=<\/body>))'.format(current_chapter)
-                    additional_contents1 = re.findall(additional_contents_pattern1, INPUT, flags=re.S)
+                    if len(contents) == 0:
+                        #(?:<a id=".+?".+?\/a>)*<a id="(.+?)".+?\/a>(.+?)(?=<a id=".+?".+?\/a>|<\/body>)
+                        additional_contents_pattern1 = r'(<a id="({})".+?\/a>(.+?)(?=<\/body>))'.format(current_chapter)
+                        additional_contents1 = re.findall(additional_contents_pattern1, INPUT, flags=re.S)
+                        contents += additional_contents1
 
-                    additional_contents_pattern9 = r'(<h. class="h..*?".+?<a id="({})".+?\/a>(.+?)(?=<\/body>))'.format(current_chapter)
-                    additional_contents9 = re.findall(additional_contents_pattern9, INPUT, re.S)
+                    if len(contents) == 0:
+                        additional_contents_pattern9 = r'(<h. class="h..*?".+?<a id="({})".+?\/a>(.+?)(?=<\/body>))'.format(current_chapter)
+                        additional_contents9 = re.findall(additional_contents_pattern9, INPUT, re.S)
+                        contents += additional_contents9
 
-                    # ch##lev#
-                    additional_contents_pattern2 = r'(<a id="({})".+?\/a>(.+?)(?=<\/body>))'.format(current_chapter)
-                    additional_contents2 = re.findall(additional_contents_pattern2, INPUT, re.S)
+                    if len(contents) == 0:
+                        # ch##lev#
+                        additional_contents_pattern2 = r'(<a id="({})".+?\/a>(.+?)(?=<\/body>))'.format(current_chapter)
+                        additional_contents2 = re.findall(additional_contents_pattern2, INPUT, re.S)
+                        contents += additional_contents2
 
-                    # <h# class="h#" id="??"
-                    additional_contents_pattern3 = r'(<h\d class="h..*?" id="({})">(.+?)(?=<\/body>))'.format(current_chapter)
-                    additional_contents3 = re.findall(additional_contents_pattern3, INPUT, re.S)
+                    if len(contents) == 0:
+                        # <h# class="h#" id="??"
+                        additional_contents_pattern3 = r'(<h\d class="h..*?" id="({})">(.+?)(?=<\/body>))'.format(current_chapter)
+                        additional_contents3 = re.findall(additional_contents_pattern3, INPUT, re.S)
+                        contents += additional_contents3
 
-                    # ch02a
-                    additional_contents_pattern4 = r'(<a id="ch\w+?"><\/a><a id="({})"><\/a>(.+?)(?:<\/body>))'.format(current_chapter)
-                    additional_contents4 = re.findall(additional_contents_pattern4, INPUT, re.S)
+                    if len(contents) == 0:
+                        # ch02a
+                        additional_contents_pattern4 = r'(<a id="ch\w+?"><\/a><a id="({})"><\/a>(.+?)(?:<\/body>))'.format(current_chapter)
+                        additional_contents4 = re.findall(additional_contents_pattern4, INPUT, re.S)
+                        contents += additional_contents4
 
-                    additional_contents_pattern5 = r'(<a id="page\w+?"><\/a><a id="({})"><\/a>(.+?)(?=<\/body>))'.format(current_chapter)
-                    additional_contents5 = re.findall(additional_contents_pattern5, INPUT, re.S)
+                    if len(contents) == 0:
+                        additional_contents_pattern5 = r'(<a id="page\w+?"><\/a><a id="({})"><\/a>(.+?)(?=<\/body>))'.format(current_chapter)
+                        additional_contents5 = re.findall(additional_contents_pattern5, INPUT, re.S)
+                        contents += additional_contents5
 
-                    additional_contents_pattern6 = r'(<a id="ch.+?".+?\/a><a id="({})".+?<\/a>(.+?)(?=<\/body>))'.format(current_chapter)
-                    additional_contents6 = re.findall(additional_contents_pattern6, INPUT, re.S)
+                    if len(contents) == 0:
+                        additional_contents_pattern6 = r'(<a id="ch.+?".+?\/a><a id="({})".+?<\/a>(.+?)(?=<\/body>))'.format(current_chapter)
+                        additional_contents6 = re.findall(additional_contents_pattern6, INPUT, re.S)
+                        contents += additional_contents6
 
-                    additional_contents_pattern8 = r'(<h. class="h..*<a id="page\w+?"><\/a><a id="({})"><\/a>(.+?)(?=<\/body>))'.format(current_chapter)
-                    additional_contents8 = re.findall(additional_contents_pattern8, INPUT, re.S)
+                    if len(contents) == 0:
+                        additional_contents_pattern8 = r'(<h. class="h..*<a id="page\w+?"><\/a><a id="({})"><\/a>(.+?)(?=<\/body>))'.format(current_chapter)
+                        additional_contents8 = re.findall(additional_contents_pattern8, INPUT, re.S)
+                        contents += additional_contents8
 
-                    additional_contents_pattern10 = r'(<p id="({})" class=".+?">.+?(?=<\/body>))'.format(current_chapter)
-                    additional_contents10 = re.findall(additional_contents_pattern10, INPUT, re.S)
+                    if len(contents) == 0:
+                        additional_contents_pattern10 = r'(<p id="({})" class=".+?">.+?(?=<\/body>))'.format(current_chapter)
+                        additional_contents10 = re.findall(additional_contents_pattern10, INPUT, re.S)
+                        contents += additional_contents10
 
-                    additional_contents_pattern11 = r'(<p class=".+?" id="({})">.+?(?=<\/body>))'.format(current_chapter)
-                    additional_contents11 = re.findall(additional_contents_pattern11, INPUT, re.S)
+                    if len(contents) == 0:
+                        additional_contents_pattern11 = r'(<p class=".+?" id="({})">.+?(?=<\/body>))'.format(current_chapter)
+                        additional_contents11 = re.findall(additional_contents_pattern11, INPUT, re.S)
+                        contents += additional_contents11
 
-                    contents += additional_contents1 + additional_contents2 + additional_contents3 + additional_contents4 + additional_contents5 + additional_contents6 + additional_contents8 + additional_contents9 + additional_contents10 + additional_contents11
                     for content_group in contents:
                         if splitter == content_group[0]:
                             content = content_group[1]
+                            break
                     if content == "":
                         for content_group in contents:
                             if splitter == content_group[1]:
                                 content = content_group[0]
+                                break
                     if content == "":
                         additional_contents_pattern7 = r'<a id="lev.+?".+?<\/a><a id="({})".+?<\/a>(.+?)(?=<\/body>)'.format(current_chapter)
                         additional_contents7 = re.findall(additional_contents_pattern7, INPUT, re.S)
                         for content_group in additional_contents7:
                             if splitter == content_group[0]:
                                 content = content_group[1]
+                                break
 
                     # пробегаемся по всем id и если такой в контенте нет, то добавляем контент по этой id
                     # for content_group in contents:
@@ -575,6 +715,11 @@ class Maker(object):
         divs = re.findall(pattern, INPUT, re.S)
         for div in divs:
             INPUT = INPUT.replace(div[0], div[1])
+
+        pattern = r'<p class="bullet\w*".+?(<img.+?\/>).+?<\/p>'
+        images = re.findall(pattern, INPUT, re.S)
+        for image in images:
+            INPUT = INPUT.replace(image, "")
         f.close()
         f = open(os.path.join(self.location, filename), 'w', encoding='utf-8')
         f.write(INPUT)
@@ -611,7 +756,12 @@ class Maker(object):
             INPUT = INPUT.replace("&#8212;", " &#8212 ")
             INPUT = INPUT.replace("•", "")
 
-            pattern = r'(<div class="(?:tx|tx1|fmhT|fmtx|atx1|fmtx1|epiv|eps|ctag1|pepiv|peps|ct|cepiv|ceps|fmtx1d|bmtx|bmhT|ctl)">(<div class="(?:tx|tx1|fmhT|fmtx|atx1|fmtx1|epiv|eps|ctag1|pepiv|peps|ct|cepiv|ceps|fmtx1d|bmtx|bmhT|ctl)">)*(.+?)<\/div>.*?(<\/div>)*)'
+            # иногда заворачивают текст в три тега:
+            pattern = r'(<div class="(?:tx|tx1|fmhT|fmtx|atx1|fmtx1|epiv|eps|ctag1|pepiv|peps|ct|cepiv|ceps|fmtx1d|bmtx|bmhT|ctl|apshT|aptx|cst|ctBT-T|chaboxg)">(<div class="(?:tx|tx1|fmhT|fmtx|atx1|fmtx1|epiv|eps|ctag1|pepiv|peps|ct|cepiv|ceps|fmtx1d|bmtx|bmhT|ctl|apshT|aptx|cst|ctBT-T|chaboxg)">)*(.+?)<\/div>.*?(<\/div>)*)'
+            divs = re.findall(pattern, INPUT, re.S)
+            for div in divs:
+                new_line = "<p>" + div[2] + "</p>"
+                INPUT = INPUT.replace(div[0], new_line)
             divs = re.findall(pattern, INPUT, re.S)
             for div in divs:
                 new_line = "<p>" + div[2] + "</p>"
@@ -621,7 +771,7 @@ class Maker(object):
                 new_line = "<p>" + div[2] + "</p>"
                 INPUT = INPUT.replace(div[0], new_line)
 
-            pattern = r'(<p class="(?:tx|tx1|fmhT|fmtx|atx1|fmtx1|epiv|eps|ctag1|pepiv|peps|ct|cepiv|ceps|fmtx1d|bmtx|bmhT|ctl)" .+?>(.+?)<\/p>)'
+            pattern = r'(<p class="(?:tx|tx1|fmhT|fmtx|atx1|fmtx1|epiv|eps|ctag1|pepiv|peps|ct|cepiv|ceps|fmtx1d|bmtx|bmhT|ctl|apshT|aptx|cst|ctBT-T|chaboxg)" .+?>(.+?)<\/p>)'
             lines = re.findall(pattern, INPUT, re.S)
             for line in lines:
                 old = line[0]
