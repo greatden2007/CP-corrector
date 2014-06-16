@@ -1,4 +1,3 @@
-Косяки по CP
 1) Неизвестный читалке формат картинок
 <svg:svg viewBox="0 0 1068 1600">
 <svg:image xlink:href="../images/1601633041.jpg" transform="translate(0 0)" width="1068" height="1600"/>
