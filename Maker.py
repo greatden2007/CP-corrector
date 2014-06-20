@@ -354,6 +354,12 @@ class Maker(object):
                         head = head.group(0)
                         contents = re.findall(pattern, INPUT, flags=re.S)
 
+                        # до тега h#, чтобы он не обрезался
+                        if len(contents) == 0:
+                            additional_contents_pattern13 = r'<body>(.+?)(?:<h. class="h."><a id="{}".+?\/a>)'.format(next_chapter)
+                            additional_contents13 = re.findall(additional_contents_pattern13, INPUT, re.S)
+                            contents += additional_contents13
+
                         if len(contents) == 0:
                             #(?:<a id=".+?".+?\/a>)*<a id="(.+?)".+?\/a>(.+?)(?=<a id=".+?".+?\/a>|<\/body>)
                             additional_contents_pattern1 = r'<body>(.+?(?=<a id="{}".+?\/a>))'.format(next_chapter)
@@ -439,6 +445,7 @@ class Maker(object):
                         f.close()
 
                 # если глава не последняя, но и не первая
+                # глава посреди текста
                 elif chapters_for_file.index(splitter) != len(chapters_for_file) - 1:
 
                     next_chapter = chapters_for_file[chapters_for_file.index(splitter) + 1]
@@ -455,17 +462,17 @@ class Maker(object):
                     content = ""
 
                     if len(contents) == 0:
+                        additional_contents_pattern9 = r'(<h. class="h.".{{0,50}}<a id="({})".+?\/a>(.+?))(?:<h. class="h..{{0,1}}".{{0,50}}<a id="{}".+?\/a>)'.format(
+                            current_chapter, next_chapter)
+                        additional_contents9 = re.findall(additional_contents_pattern9, INPUT, re.S)
+                        contents += additional_contents9
+
+                    if len(contents) == 0:
                         #(?:<a id=".+?".+?\/a>)*<a id="(.+?)".+?\/a>(.+?)(?=<a id=".+?".+?\/a>|<\/body>)
                         additional_contents_pattern1 = r'(<a id="({})".+?\/a>(.+?)(?=<a id="{}".+?\/a>))'.format(
                             current_chapter, next_chapter)
                         additional_contents1 = re.findall(additional_contents_pattern1, INPUT, flags=re.S)
                         contents += additional_contents1
-
-                    if len(contents) == 0:
-                        additional_contents_pattern9 = r'(<h. class="h..*?".+?<a id="({})".+?\/a>(.+?)(?=<h. class="h..*?".+?<a id="{}".+?\/a>))'.format(
-                            current_chapter, next_chapter)
-                        additional_contents9 = re.findall(additional_contents_pattern9, INPUT, re.S)
-                        contents += additional_contents9
 
                     if len(contents) == 0:
                         # ch##lev#
@@ -574,16 +581,15 @@ class Maker(object):
                     content = ""
 
                     if len(contents) == 0:
+                        additional_contents_pattern9 = r'(<h. class="h..{{0,1}}">.{{0,50}}<a id="({})".+?\/a>(.+?)(?=<\/body>))'.format(current_chapter)
+                        additional_contents9 = re.findall(additional_contents_pattern9, INPUT, re.S)
+                        contents += additional_contents9
+
+                    if len(contents) == 0:
                         #(?:<a id=".+?".+?\/a>)*<a id="(.+?)".+?\/a>(.+?)(?=<a id=".+?".+?\/a>|<\/body>)
                         additional_contents_pattern1 = r'(<a id="({})".+?\/a>(.+?)(?=<\/body>))'.format(current_chapter)
                         additional_contents1 = re.findall(additional_contents_pattern1, INPUT, flags=re.S)
                         contents += additional_contents1
-
-                    if len(contents) == 0:
-                        additional_contents_pattern9 = r'(<h. class="h..*?".+?<a id="({})".+?\/a>(.+?)(?=<\/body>))'.format(
-                            current_chapter)
-                        additional_contents9 = re.findall(additional_contents_pattern9, INPUT, re.S)
-                        contents += additional_contents9
 
                     if len(contents) == 0:
                         # ch##lev#
